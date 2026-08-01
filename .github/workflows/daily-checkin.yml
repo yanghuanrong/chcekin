@@ -1,0 +1,35 @@
+name: Daily Juejin Check-in
+
+on:
+  schedule:
+    # UTC 00:00 ≈ 北京时间 08:00
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run check-in
+        env:
+          JUEJIN_COOKIE: ${{ secrets.JUEJIN_COOKIE }}
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+          ENABLE_LOTTERY: "true"
+          CI: "true"
+        run: npm start

@@ -1,0 +1,8 @@
+node_modules/
+.env
+.DS_Store
+*.log
+.playwright-mcp/
+.storage-state.json
+.cookies.json
+.storage-state.json
