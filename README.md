@@ -59,17 +59,18 @@ npm start
 
 ## GitHub Actions
 
+Workflow：`.github/workflows/daily-checkin.yml`
+
+- `schedule`: UTC `50 1 * * *`（北京时间 **每天 09:50**；GitHub 定时可能有几分钟延迟）
+- `workflow_dispatch`: 可手动触发
+- 会安装 Playwright Chromium（用于绕过签到写接口风控）
+
 Secrets：
 
 - `JUEJIN_COOKIE`（必填）
 - `DINGTALK_WEBHOOK`（建议）
 - `DINGTALK_SECRET`（加签时）
-
-Workflow：`.github/workflows/daily-checkin.yml`
-
-- `schedule`: UTC `0 0 * * *`（约北京时间 08:00）
-- `workflow_dispatch`: 可手动触发
-- 会安装 Playwright Chromium（用于绕过签到写接口风控）
+- `DINGTALK_KEYWORD`（可选，默认脚本内为「掘金」）
 
 ## API（Playwright 抓包确认）
 

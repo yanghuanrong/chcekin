@@ -166,11 +166,19 @@ function isAlreadyCheckedIn(resp, today) {
   return false;
 }
 
-async function notifyDingTalk(markdown) {
+/** 单次进程只允许推送一次钉钉，避免重复 hooks */
+let dingTalkSent = false;
+
+async function notifyDingTalk(text) {
   const webhook = process.env.DINGTALK_WEBHOOK;
   if (!webhook) {
     return { skipped: true };
   }
+  if (dingTalkSent) {
+    return { skipped: true, reason: 'already_sent' };
+  }
+  dingTalkSent = true;
+
   let url = webhook;
   const secret = process.env.DINGTALK_SECRET;
   if (secret) {
@@ -183,15 +191,25 @@ async function notifyDingTalk(markdown) {
     );
     url += `${url.includes('?') ? '&' : '?'}timestamp=${timestamp}&sign=${sign}`;
   }
+  // 机器人自定义关键词（当前为「掘金」）；摘要标题已含该词时不再前缀
+  const keyword = (process.env.DINGTALK_KEYWORD || '掘金').trim();
+  const content =
+    keyword && !text.includes(keyword) ? `${keyword}\n${text}` : text;
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      msgtype: 'markdown',
-      markdown: { title: '掘金签到', text: markdown },
+      msgtype: 'text',
+      text: { content },
     }),
   });
-  return res.json().catch(() => ({}));
+  const data = await res.json().catch(() => ({}));
+  // 发送失败时允许同进程重试一次（仅失败场景）
+  if (data && data.errcode != null && data.errcode !== 0) {
+    dingTalkSent = false;
+  }
+  return data;
 }
 
 function nowStr() {
@@ -217,8 +235,8 @@ async function fetchPointAndCounts(cookie) {
   };
 }
 
-function printSummary(result) {
-  const lines = [
+function formatSummary(result) {
+  return [
     '======== 掘金签到 ========',
     `状态      : ${result.statusLabel}`,
     result.incrPoint != null ? `本次矿石  : +${result.incrPoint}` : null,
@@ -229,8 +247,9 @@ function printSummary(result) {
     `幸运值    : ${result.luckyProgress || (result.luckyValue != null ? String(result.luckyValue) : '-')}`,
     `时间      : ${result.time}`,
     '==========================',
-  ].filter(Boolean);
-  console.log(lines.join('\n'));
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function main() {
@@ -239,7 +258,13 @@ async function main() {
     console.error('缺少环境变量 JUEJIN_COOKIE');
     process.exitCode = 1;
     await notifyDingTalk(
-      `### 掘金签到失败\n\n- **状态**: 配置缺失\n- **消息**: 缺少 JUEJIN_COOKIE\n- **时间**: ${nowStr()}`
+      [
+        '======== 掘金签到 ========',
+        '状态      : 配置缺失',
+        '消息      : 缺少 JUEJIN_COOKIE',
+        `时间      : ${nowStr()}`,
+        '==========================',
+      ].join('\n')
     );
     return;
   }
@@ -352,26 +377,16 @@ async function main() {
     raw,
     time: nowStr(),
   };
-  printSummary(result);
+  const summary = formatSummary(result);
+  console.log(summary);
 
-  const md = [
-    '### 掘金签到结果',
-    '',
-    `- **状态**: ${statusLabel}`,
-    incrPoint != null ? `- **本次积分**: +${incrPoint}` : null,
-    sumPoint != null ? `- **当前矿石**: ${sumPoint}` : null,
-    contCount != null ? `- **连续签到**: ${contCount} 天` : null,
-    sumCount != null ? `- **累计签到**: ${sumCount} 天` : null,
-    lotteryMsg ? `- **抽奖**: ${lotteryMsg}` : null,
-    luckyProgress || luckyValue != null
-      ? `- **幸运值**: ${luckyProgress || luckyValue}`
-      : null,
-    `- **时间**: ${nowStr()}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  await notifyDingTalk(md);
+  // 整次执行只在这里推送一次（与控制台摘要相同）
+  const ding = await notifyDingTalk(summary);
+  if (ding?.skipped && ding.reason === 'already_sent') {
+    console.error('[dingtalk] 已跳过重复推送');
+  } else if (ding && ding.errcode != null && ding.errcode !== 0) {
+    console.error(`[dingtalk] 发送失败: ${ding.errmsg || ding.errcode}`);
+  }
 
   // 已签到 / 签到成功 → 成功退出；仅鉴权失败、真正失败、异常才非 0
   if (status === 'auth_failed' || status === 'failed' || status === 'error') {
@@ -379,4 +394,7 @@ async function main() {
   }
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

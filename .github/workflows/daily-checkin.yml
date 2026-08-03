@@ -2,14 +2,14 @@ name: Daily Juejin Check-in
 
 on:
   schedule:
-    # UTC 00:00 ≈ 北京时间 08:00
-    - cron: "0 0 * * *"
+    # 北京时间 09:50 = UTC 01:50
+    - cron: "50 1 * * *"
   workflow_dispatch:
 
 jobs:
   checkin:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,6 +30,7 @@ jobs:
           JUEJIN_COOKIE: ${{ secrets.JUEJIN_COOKIE }}
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+          DINGTALK_KEYWORD: ${{ secrets.DINGTALK_KEYWORD }}
           ENABLE_LOTTERY: "true"
           CI: "true"
-        run: npm start
+        run: node index.js
