@@ -1,6 +1,7 @@
 name: Daily Juejin Check-in
 
-on:
+# 必须给 on 加引号，避免 YAML 把 on 解析成布尔值导致 Actions 不识别
+"on":
   schedule:
     # 北京时间 09:50 = UTC 01:50
     - cron: "50 1 * * *"
