@@ -3,9 +3,11 @@ name: Daily Juejin Check-in
 # 必须给 on 加引号，避免 YAML 把 on 解析成布尔值导致 Actions 不识别
 "on":
   schedule:
-    # 北京时间 09:50 = UTC 01:50
-    - cron: "50 1 * * *"
-  workflow_dispatch:
+    # 北京时间 08:00 = UTC 00:00
+    - cron: "0 0 * * *"
+    # 备份：北京时间 08:30 = UTC 00:30（主定时被延迟/丢弃时兜底）
+    - cron: "30 0 * * *"
+  workflow_dispatch: {}
 
 jobs:
   checkin:
