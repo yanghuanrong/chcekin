@@ -61,9 +61,10 @@ npm start
 
 Workflow：`.github/workflows/daily-checkin.yml`
 
-- `schedule`: UTC `50 1 * * *`（北京时间 **每天 09:50**；GitHub 定时可能有几分钟延迟）
+- `schedule`: UTC `0 0 * * *` / `30 0 * * *`（北京时间 **每天 08:00 / 08:30**；GitHub 定时可能有几分钟延迟）
 - `workflow_dispatch`: 可手动触发
 - 会安装 Playwright Chromium（用于绕过签到写接口风控）
+- `repo-keepalive.yml`：约每 30 天自动更新本文件底部时间戳并 commit，保持仓库活跃（公开仓库 60 天无活动会禁用 schedule）
 
 Secrets：
 
@@ -98,9 +99,38 @@ Secrets：
 {"err_no":0,"err_msg":"success","data":{"incr_point":7,"sum_point":16429,"cont_count":2,"sum_count":388}}
 ```
 
+## GitHub Actions 不跑了？排查清单
+
+先区分「**工作流没触发**」和「**触发了但签到失败**」（后者钉钉仍会推送，状态为 Cookie 失效 / 签到失败）。
+
+### 1. 去 Actions 页确认（最常见）
+
+仓库 → **Actions** → 选择 **Daily Juejin Check-in**：
+
+| 现象 | 可能原因 | 处理 |
+|------|----------|------|
+| 顶部提示 workflow **已禁用** | 公开仓库约 60 天无 push 会被 GitHub 自动停用 schedule | 点 **Enable workflow** 重新启用 |
+| 最近几天 **没有任何 run** | schedule 被禁用，或仓库为 fork 且未开启 Actions | 启用 workflow；fork 需在 Actions 里允许 |
+| 有 run 但 **失败**（红叉） | Cookie 过期、Playwright 安装失败、私有仓库 Actions 分钟用尽 | 看该 run 的日志 |
+| 有 run 且 **成功**，但掘金未签到 | 极少见；核对日志里 `状态` 是否为「今日已签到」 | 手动 `workflow_dispatch` 再跑一次对比 |
+
+### 2. Cookie 约 30 天过期（与「连续签到 26 天」高度相关）
+
+掘金 `sid_guard` 一般 **约 30 天**续期。跑满二十多天后 Cookie 失效是常态，不是 Actions「坏了」。
+
+**处理**：浏览器重新登录掘金 → 复制完整 Cookie → 更新 GitHub **Settings → Secrets → `JUEJIN_COOKIE`** → 手动触发一次 workflow 验证。
+
+脚本会从 `sid_guard` 解析过期时间；剩余 ≤7 天时钉钉摘要会带 **提醒** 行。
+
+### 3. 私有仓库 Actions 额度
+
+私有仓库免费账户每月约 **2000 分钟**。本 workflow 每次会装 Playwright，单次约 5–10 分钟。若额度用尽，新 run 会排队失败。在 **Settings → Billing → Actions** 查看用量。
+
 ## 风险说明
 
 - 浏览器内 fetch 会被 SDK 自动附加 `msToken` / `a_bogus`；纯 Node POST 有时返回空 body。
 - 脚本以 `get_today_status.check_in_done` 与 `err_no=15001` 判定「已签到成功」。
 - 若未签到且 POST 空响应，可临时从浏览器 Network 复制 `msToken`/`a_bogus`，或更新 Cookie 后重试。
 - 勿将真实 Cookie / Webhook 提交到 Git（已在 `.gitignore` 忽略 `.env`）。
+
+<!-- repo-keepalive: 2026-08-27 14:50:00 -->

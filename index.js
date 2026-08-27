@@ -50,6 +50,39 @@ function extractUuid(cookie) {
   }
 }
 
+/** 从 sid_guard 解析 Cookie 过期时间（掘金约 30 天续期） */
+function getSidGuardExpiry(cookie) {
+  const m = cookie.match(/sid_guard=([^;]+)/);
+  if (!m) return null;
+  try {
+    let raw = decodeURIComponent(m[1]);
+    if (raw.includes('%')) raw = decodeURIComponent(raw);
+    const parts = raw.split('|');
+    if (parts.length < 4) return null;
+    const created = Number(parts[2]);
+    const maxAge = Number(parts[3]);
+    if (!created || !maxAge) return null;
+    return new Date((created + maxAge) * 1000);
+  } catch {
+    return null;
+  }
+}
+
+function formatCookieExpiryHint(cookie) {
+  const expiry = getSidGuardExpiry(cookie);
+  if (!expiry) return null;
+  const msLeft = expiry.getTime() - Date.now();
+  const daysLeft = Math.ceil(msLeft / 86400000);
+  const expiryStr = expiry.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  if (msLeft <= 0) {
+    return `Cookie 已过期（sid_guard 至 ${expiryStr}），请更新 JUEJIN_COOKIE`;
+  }
+  if (daysLeft <= 7) {
+    return `Cookie 即将过期（约 ${daysLeft} 天后，${expiryStr}），请尽快更新 JUEJIN_COOKIE`;
+  }
+  return null;
+}
+
 function buildUrl(apiPath, extra = {}) {
   const params = new URLSearchParams({ aid: AID, spider: '0' });
   const uuid = process.env.JUEJIN_UUID || extra.uuid || '';
@@ -238,6 +271,7 @@ async function fetchPointAndCounts(cookie) {
 function formatSummary(result) {
   return [
     '======== 掘金签到 ========',
+    result.cookieHint ? `提醒      : ${result.cookieHint}` : null,
     `状态      : ${result.statusLabel}`,
     result.incrPoint != null ? `本次矿石  : +${result.incrPoint}` : null,
     result.sumPoint != null ? `当前矿石  : ${result.sumPoint}` : null,
@@ -273,6 +307,9 @@ async function main() {
     const uuid = extractUuid(cookie);
     if (uuid) process.env.JUEJIN_UUID = uuid;
   }
+
+  const cookieHint = formatCookieExpiryHint(cookie);
+  if (cookieHint) console.log(`[warn] ${cookieHint}`);
 
   const enableLottery = String(process.env.ENABLE_LOTTERY ?? 'true') !== 'false';
 
@@ -366,6 +403,7 @@ async function main() {
   const result = {
     status,
     statusLabel,
+    cookieHint,
     message,
     incrPoint,
     sumPoint,
