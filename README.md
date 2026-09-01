@@ -133,4 +133,4 @@ Secrets：
 - 若未签到且 POST 空响应，可临时从浏览器 Network 复制 `msToken`/`a_bogus`，或更新 Cookie 后重试。
 - 勿将真实 Cookie / Webhook 提交到 Git（已在 `.gitignore` 忽略 `.env`）。
 
-<!-- repo-keepalive: 2026-08-27 14:50:00 -->
+<!-- repo-keepalive: 2026-09-01 11:06:11 -->
